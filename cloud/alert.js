@@ -196,7 +196,7 @@ async function main() {
   const res = analyze(closed);
 
   let pushed = false;
-  if (res.signal && state.lastSignalTs !== lastBar.t) {
+  if (res.signal) {
     const s = res.side === "long" ? "做多" : "做空";
     const body = [
       `${s} 入场 ${fmt(res.price)}`,
@@ -208,11 +208,20 @@ async function main() {
       `RSI ${res.rsi.toFixed(0)} ATR ${res.atr.toFixed(0)}`
     ].join("\n");
     pushed = await push(`ETH 4H ${s}信号`, body);
-    state.lastSignalTs = lastBar.t;
-    state.openTime = Date.now();
-    state.notified10 = false;
+    if (state.lastSignalTs !== lastBar.t) {
+      state.lastSignalTs = lastBar.t;
+      state.openTime = Date.now();
+      state.notified10 = false;
+    }
     console.log("signal", s, res.price, res.stop, res.target);
-  } else if (!res.signal) {
+  } else {
+    const body = [
+      `价格 ${fmt(res.price)}`,
+      `RSI ${res.rsi != null ? res.rsi.toFixed(0) : "-"} · ATR ${res.atr != null ? res.atr.toFixed(0) : "-"}`,
+      res.note || "条件未满足",
+      `K线 ${new Date(lastBar.t).toISOString().slice(0, 16)} UTC`
+    ].join("\n");
+    pushed = await push("ETH 4H · 无信号", body);
     console.log("no signal:", res.note || "");
   }
 
