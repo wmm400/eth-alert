@@ -1,0 +1,41 @@
+name: ETH 4H Alert
+
+on:
+  schedule:
+    # UTC 时间；对应北京时间 08:05 / 12:05 / 16:05 / 20:05 / 00:05 / 04:05
+    - cron: "5 0,4,8,12,16,20 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: eth-alert
+  cancel-in-progress: false
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Check signal and push
+        env:
+          BARK_KEY: ${{ secrets.BARK_KEY }}
+        run: node cloud/alert.js
+
+      - name: Persist state
+        run: |
+          git config user.name "eth-alert-bot"
+          git config user.email "eth-alert-bot@users.noreply.github.com"
+          git add cloud/state.json
+          if git diff --cached --quiet; then
+            echo "state unchanged"
+          else
+            git commit -m "chore: update alert state"
+            git push
+          fi
