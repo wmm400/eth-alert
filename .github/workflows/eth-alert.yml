@@ -1,9 +1,9 @@
 name: ETH 4H Alert
 
 on:
-  schedule:
-    # UTC 时间；对应北京时间 08:05 / 12:05 / 16:05 / 20:05 / 00:05 / 04:05
-    - cron: "5 0,4,8,12,16,20 * * *"
+  # 定时交给 cron-job.org，GitHub 自带 schedule 会延迟 1-3 小时并漏跑
+  # schedule:
+  #   - cron: "5 0,4,8,12,16,20 * * *"
   workflow_dispatch: {}
 
 permissions:
@@ -21,7 +21,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Check signal and push
         env:
