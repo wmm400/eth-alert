@@ -14,7 +14,7 @@ const CONFIG = {
   rr: 2.0,
   addLevels: [0.25, 0.35],
   addSize: 0.5,
-  minRisk: 20,
+  minRisk: 20, // 止损距离下限：小于它就把止损拉到 20（不放弃信号）
   maxRiskAtr: 3,
   timeStopDays: 10,
   // 高分加倍规则
@@ -185,12 +185,19 @@ function analyze(candles) {
   if (!side) return { signal: false, price, rsi: r, atr: a, levels };
   const lvl = side === "long" ? levels.supports[0] : levels.resistances[0];
   if (!lvl || lvl.score < CONFIG.minScore) return { signal: false, price, note: "强位不足", rsi: r, atr: a };
-  const stop = side === "long" ? lvl.price - 0.15 * a : lvl.price + 0.15 * a;
-  const risk = Math.abs(price - stop);
-  if (risk < CONFIG.minRisk || risk > CONFIG.maxRiskAtr * a) return { signal: false, price, note: "止损距离不符", rsi: r, atr: a };
+  let stop = side === "long" ? lvl.price - 0.15 * a : lvl.price + 0.15 * a;
+  let risk = Math.abs(price - stop);
+  let widened = false;
+  // 止损太近时不放弃：直接把止损拉到 minRisk，止盈同步按 2R 外推
+  if (risk < CONFIG.minRisk) {
+    risk = CONFIG.minRisk;
+    stop = side === "long" ? price - risk : price + risk;
+    widened = true;
+  }
+  if (risk > CONFIG.maxRiskAtr * a) return { signal: false, price, note: "止损距离不符", rsi: r, atr: a };
   const target = side === "long" ? price + CONFIG.rr * risk : price - CONFIG.rr * risk;
   const adds = CONFIG.addLevels.map(l => ({ level: l, price: side === "long" ? price - l * risk : price + l * risk }));
-  return { signal: true, side, price, stop, target, adds, risk, level: lvl, rsi: r, atr: a };
+  return { signal: true, side, price, stop, target, adds, risk, widened, level: lvl, rsi: r, atr: a };
 }
 
 const fmt = v => Number(v).toLocaleString("en-US", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
@@ -342,12 +349,12 @@ async function main() {
   if (action && action.type === "open") {
     title = `ETH 4H ${sideText(res.side)}信号${res.score > CONFIG.highScore ? "·高分×" + CONFIG.highMult : ""}`;
     lines.push(`新开 ${sideText(res.side)} ${action.size} ETH @${fmt(res.price)}`);
-    lines.push(`止损 ${fmt(res.stop)} / 止盈 ${fmt(res.target)}（${res.score.toFixed(1)} 分）`);
+    lines.push(`止损 ${fmt(res.stop)} / 止盈 ${fmt(res.target)}（${res.score.toFixed(1)} 分）${res.widened ? " · 止损已拉宽到 " + CONFIG.minRisk : ""}`);
     lines.push(`加仓 ${fmt(res.adds[0].price)} / ${fmt(res.adds[1].price)}`);
   } else if (action && action.type === "parallel") {
     title = `ETH 4H ${sideText(res.side)}信号·高分并行`;
     lines.push(`并行开仓 ${sideText(res.side)} ${action.size} ETH @${fmt(res.price)}（第 ${state.positions.length} 笔）`);
-    lines.push(`止损 ${fmt(res.stop)} / 止盈 ${fmt(res.target)}（${res.score.toFixed(1)} 分）`);
+    lines.push(`止损 ${fmt(res.stop)} / 止盈 ${fmt(res.target)}（${res.score.toFixed(1)} 分）${res.widened ? " · 止损已拉宽到 " + CONFIG.minRisk : ""}`);
     lines.push(`加仓 ${fmt(res.adds[0].price)} / ${fmt(res.adds[1].price)}`);
   } else if (action && action.type === "ignore") {
     title = `ETH 4H ${sideText(res.side)}信号·未开仓`;
