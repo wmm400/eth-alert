@@ -1,5 +1,8 @@
 {
   "lastSignalTs": 0,
-  "openTime": 0,
-  "notified10": false
+  "positions": [],
+  "realizedUsd": 0,
+  "closedCount": 0,
+  "winCount": 0,
+  "notified10": []
 }
